@@ -1,0 +1,24 @@
+{{> head}}
+        <div class="container">
+            <div class="row">
+                <div class="span10">
+                    <table class="table table-striped">
+                        <thead>
+                        </thead>
+
+                        <tbody>
+{{#commits}}
+                            <tr>
+                                <td><a href="/commits/{{hex}}">{{short}}</a></td>
+                                <td>{{summary}}</td>
+                                <td><a href="mailto:{{author.email}}">{{author.name}}</a></td>
+                                <td>{{age}}</td>
+                            </tr>
+{{/commits}}
+                        </tbody>
+
+                </div>
+            </div>
+
+        </div>
+{{> foot}}

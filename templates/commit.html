@@ -1,0 +1,28 @@
+{{> head}}
+        <div class="container">
+            <div class="row">
+                <div class="span8">
+                    <h3>{{commit.summary}}</h3>
+                    <pre>{{commit.detail}}</pre>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="span10">
+                    <table class="table table-striped">
+                        <thead>
+                        </thead>
+
+                        <tbody>
+{{#entries}}
+                            <tr>
+                                <td><a href="{{url}}">{{name}}</a></td>
+                            </tr>
+{{/entries}}
+                        </tbody>
+
+                </div>
+            </div>
+
+        </div>
+{{> foot}}
