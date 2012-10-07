@@ -66,15 +66,13 @@ class CommitModel(object):
         return self.hex[:8]
 
 class DiffLineModel(object):
-    def __init__(self, data, line, kind):
+    def __init__(self, data, old_line, new_line, kind):
         self.data = data
-        self.line = line
+        self.old_line = old_line
+        self.new_line = new_line
         self.kind = kind
 
 class DiffHunkModel(object):
-    ADDITION_FMT = '<pre>+ %s</pre>'
-    DELETION_FMT = '<pre>- %s</pre>'
-    CONTEXT_FMT = '<pre>  %s</pre>'
     def __init__(self, repo, commit, hunk):
         self._repo = repo
         self._commit = commit
@@ -96,15 +94,17 @@ class DiffHunkModel(object):
 
         for (line, kind) in data:
             if kind == pygit2.GIT_DIFF_LINE_ADDITION:
-                hunk.append((ol, nl, self.ADDITION_FMT % line.rstrip('\n\r')))
+                lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'add')
                 nl += 1
             elif kind == pygit2.GIT_DIFF_LINE_DELETION:
-                hunk.append((ol, nl, self.DELETION_FMT % line.rstrip('\n\r')))
+                lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'del')
                 ol += 1
             elif kind == pygit2.GIT_DIFF_LINE_CONTEXT:
-                hunk.append((ol, nl, self.CONTEXT_FMT % line.rstrip('\n\r')))
+                lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'context')
                 nl += 1
                 ol += 1
+
+            hunk.append(lm)
 
         return hunk
 
