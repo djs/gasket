@@ -14,11 +14,22 @@
                         </thead>
 
                         <tbody>
-{{#entries}}
+{{#diff}}
                             <tr>
-                                <td><a href="{{url}}">{{name}}</a></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td>{{header}}</td>
                             </tr>
-{{/entries}}
+                            {{#hunk}}
+                            <tr>
+                                <td>{{old_line}}</td>
+                                <td>{{new_line}}</td>
+                                <td>{{kind}}</td>
+                                <td>{{data}}</td>
+                            </tr>
+                            {{/hunk}}
+{{/diff}}
                         </tbody>
 
                 </div>

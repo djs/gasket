@@ -94,10 +94,10 @@ class DiffHunkModel(object):
 
         for (line, kind) in data:
             if kind == pygit2.GIT_DIFF_LINE_ADDITION:
-                lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'add')
+                lm = DiffLineModel(line.rstrip('\n\r'), '', nl, 'add')
                 nl += 1
             elif kind == pygit2.GIT_DIFF_LINE_DELETION:
-                lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'del')
+                lm = DiffLineModel(line.rstrip('\n\r'), ol, '', 'del')
                 ol += 1
             elif kind == pygit2.GIT_DIFF_LINE_CONTEXT:
                 lm = DiffLineModel(line.rstrip('\n\r'), ol, nl, 'context')
@@ -145,13 +145,14 @@ def commits():
 def commit(sha1):
     commit = CommitModel(repo, repo[sha1])
 
-    entries = commit.tree
+    diff = repo[sha1].tree.diff(repo[sha1].parents[0].tree)
+    dm = DiffModel(repo, commit, diff)
 
     renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
     loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
     #with open('tree.html') as fh:
     #    return pystache.render(fh.read(), entries=entries)
-    return renderer.render(loader.load_name('tree'), commit=commit, sha1=sha1, entries=entries)
+    return renderer.render(loader.load_name('commit'), commit=commit, sha1=sha1, diff=dm)
 
 
 @app.route('/trees/<ref>')
