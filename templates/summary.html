@@ -1,0 +1,64 @@
+{{> head}}
+        <div class="container">
+            <div class="row">
+                <div class="span10">
+                    <div class="span2 btn-group">
+                        <button class="btn">{{branch}}</button>
+                        <button class="btn dropdown-toggle" data-toggle="dropdown" href="#">
+                        <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            {{#branches}}
+                            <li><a href="#">{{name}}</a></li>
+                            {{/branches}}
+                        </ul>
+                    </div>
+
+                    <div class="span2 btn-group">
+                        <button class="btn">Tags</button>
+                        <button class="btn dropdown-toggle" data-toggle="dropdown" href="#">
+                        <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            {{#tags}}
+                            <li><a href="#">{{name}}</a></li>
+                            {{/tags}}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="row">
+                <div class="span8">
+                    <h3>{{commit.summary}}</h3>
+                    <pre>{{commit.detail}}</pre>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="span10">
+                    <table class="table table-striped">
+                        <thead>
+                        </thead>
+
+                        <tbody>
+{{#entries}}
+                            <tr>
+                                <td><a href="{{url}}">{{name}}</a></td>
+                            </tr>
+{{/entries}}
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="span10">
+                    <pre>{{readme.data}}</pre>
+                </div>
+            </div>
+
+        </div>
+{{> foot}}

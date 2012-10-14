@@ -1,8 +1,12 @@
 from flask import Flask
+from flask import abort
+from flask import request
+from flask import url_for
 import pygit2
 import pystache
 
 from datetime import datetime
+from math import ceil
 
 app = Flask(__name__)
 
@@ -27,18 +31,23 @@ class TreeModel(object):
 
             yield item
 
+    def __getitem__(self, key):
+        return BlobModel(self._repo, self._tree[key].to_object(), key)
+
+
 class BlobModel(object):
     def __init__(self, repo, blob, name):
         self._repo = repo
         self._blob = blob
         self.name = name
         self.url = u'/blobs/%s' % self._blob.hex
+        self.data = self._blob.data
 
 class CommitModel(object):
     def __init__(self, repo, commit):
         self._repo = repo
         self._commit = commit
-        self.url = u'/commits/%s' % self._commit.hex
+        self.url = url_for('commit', sha1=self._commit.hex)
         self.timestamp = self._commit.author.time
         self.author = self._commit.author
         self.committer = self._commit.committer
@@ -125,23 +134,98 @@ class DiffHunkContextModel(object):
     def __init__(self, repo, commit, data):
         pass
 
+class PageModel(object):
+    def __init__(self, page, active):
+        self.page = page
+        self.active = active
 
-@app.route('/commits')
-def commits():
+class PaginationModel(object):
+    def __init__(self, items, limit, current, depth):
+        self._items = items
+        self._limit = limit
+        self._current = current
+        self._depth = depth
+        self._pages = int(ceil(items / limit))
+
+        assert depth % 2 == 1
+        #self.current_page = (self._current / self._items) + 1
+        self._current_page = current
+
+    def __iter__(self):
+        for page in xrange(self._pages):
+            if page == self._current:
+                active = 'active'
+            else:
+                active = ''
+            yield PageModel(page, active)
+
+class TagModel(object):
+    def __init__(self, ref):
+        self.ref = ref
+        self.name = self.ref.replace('refs/tags/', '', 1)
+
+class BranchModel(object):
+    def __init__(self, ref):
+        self.ref = ref
+        self.name = self.ref.replace('refs/heads/', '', 1)
+
+
+
+@app.route('/')
+def summary():
     head = repo.head
 
-    commits = []
-    for commit in repo.walk(head.oid, pygit2.GIT_SORT_TIME):
-        commits.append(CommitModel(repo, commit))
+    tree = TreeModel(repo, head.tree)
+
+    entries = tree
+
+    commit = CommitModel(repo, repo.head)
+
+    branch = repo.lookup_reference('HEAD').target.replace('refs/heads/', '', 1)
+    branches = [BranchModel(x) for x in repo.listall_references() if x.startswith('refs/heads/')]
+    tags = [TagModel(x) for x in repo.listall_references() if x.startswith('refs/tags/')]
+
+    readme = tree['README.md']
+
 
     renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
+    loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
+    #with open('tree.html') as fh:
+    #    return pystache.render(fh.read(), entries=entries)
+    return renderer.render(loader.load_name('summary'), commit=commit, entries=entries, branch=branch, branches=branches, tags=tags, readme=readme)
+
+@app.route('/commits/<ref>')
+@app.route('/commits/')
+def commits(ref=None):
+    try:
+        page = int(request.args.get('page', '1'))
+    except ValueError:
+        abort(400)
+
+    try:
+        limit = int(request.args.get('limit', '30'))
+    except ValueError:
+        abort(400)
+
+    head = repo.head
+    commits = []
+
+    for index, commit in enumerate(repo.walk(head.oid, pygit2.GIT_SORT_TIME)):
+        if index >= (limit * (page - 1)) and index < (limit * page):
+            commits.append(CommitModel(repo, commit))
+        elif index >= (limit * page):
+            pass
+
+    pagination = PaginationModel(index, limit, page, 5)
+
+    renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'], string_encoding='utf-8')
     loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
     #with open('commits.html') as fh:
     #    return pystache.render(fh.read(), commits=commits)
 
-    return renderer.render(loader.load_name('commits'), commits=commits)
+    return renderer.render(loader.load_name('commits'), commits=commits, pagination=pagination)
 
-@app.route('/commits/<sha1>')
+@app.route('/commit/<sha1>')
 def commit(sha1):
     commit = CommitModel(repo, repo[sha1])
 

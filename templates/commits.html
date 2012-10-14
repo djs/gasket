@@ -9,14 +9,21 @@
                         <tbody>
 {{#commits}}
                             <tr>
-                                <td><a href="/commits/{{hex}}">{{short}}</a></td>
+                                <td><a href="{{url}}">{{short}}</a></td>
                                 <td>{{summary}}</td>
                                 <td><a href="mailto:{{author.email}}">{{author.name}}</a></td>
                                 <td>{{age}}</td>
                             </tr>
 {{/commits}}
                         </tbody>
-
+                    </table>
+                    <div class="pagination">
+                        <ul>
+                            {{#pagination}}
+                            <li class="{{active}}">{{page}}</li>
+                            {{/pagination}}
+                        </ul>
+                    </div>
                 </div>
             </div>
 
