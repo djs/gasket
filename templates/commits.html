@@ -17,10 +17,14 @@
 {{/commits}}
                         </tbody>
                     </table>
+                </div>
+            </div>
+            <div class="row">
+                <div class="span10">
                     <div class="pagination">
                         <ul>
                             {{#pagination}}
-                            <li class="{{active}}">{{page}}</li>
+                            <li class="{{active}}"><a href="{{url}}">{{page}}</a></li>
                             {{/pagination}}
                         </ul>
                     </div>

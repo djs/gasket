@@ -2,6 +2,15 @@
         <div class="container">
             <div class="row">
                 <div class="span10">
+                    <ul class="nav nav-tabs">
+                        <li class="active"><a href="#">Overview</a></li>
+                        <li><a href="/commits/{{branch}}">Commits</a></li>
+                        <li><a href="#">Nothing</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row">
+                <div class="span10">
                     <div class="span2 btn-group">
                         <button class="btn">{{branch}}</button>
                         <button class="btn dropdown-toggle" data-toggle="dropdown" href="#">
@@ -28,11 +37,22 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="span10">
+                    <ul class="breadcrumb">
+                        {{#entries.breadcrumbs}}
+                        <li class="{{class}}"><a href="{{url}}">{{entry}}</a> <span class="divider">/</span></li>
+                        {{/entries.breadcrumbs}}
+                    </ul>
+                </div>
+            </div>
+
 
             <div class="row">
                 <div class="span8">
-                    <h3>{{commit.summary}}</h3>
+                    <h3><a href="{{commit.url}}">{{commit.summary}}</a></h3>
                     <pre>{{commit.detail}}</pre>
+                    <p>{{commit.author.name}}, authored {{commit.age}}</p>
                 </div>
             </div>
 
@@ -45,7 +65,7 @@
                         <tbody>
 {{#entries}}
                             <tr>
-                                <td><a href="{{url}}">{{name}}</a></td>
+                                <td><i class="icon-{{type}}"></i> <a href="{{url}}">{{name}}</a></td>
                             </tr>
 {{/entries}}
                         </tbody>
@@ -56,7 +76,7 @@
 
             <div class="row">
                 <div class="span10">
-                    <pre>{{readme.data}}</pre>
+                    {{{readme.data}}}
                 </div>
             </div>
 

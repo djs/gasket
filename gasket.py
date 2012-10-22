@@ -7,52 +7,93 @@ import pystache
 
 from datetime import datetime
 from math import ceil
+from markdown import markdown
+import os.path
+
+from flask_debugtoolbar import DebugToolbarExtension
 
 app = Flask(__name__)
+app.config['SECRETKEY'] = '24wejfhdsjfhwfgsfdsghfsdf'
+toolbar = DebugToolbarExtension(app)
 
 
 class TreeModel(object):
-    def __init__(self, repo, tree, name=None):
+    def __init__(self, repo, commit, tree, name, ref):
         self._repo = repo
         self._tree = tree
-        self.url = u'/trees/%s' % self._tree.hex
+        self._commit = commit
+        self._ref = ref
+        self._path = name
+        self.url = url_for('summary', ref=self._ref, path=self._path)
         self.hex = self._tree.hex
-        self.name = name
+        self.name = os.path.basename(name)
+        self.type = 'folder-close'
+
+    def _get_subpath(self, entry):
+        if self.name == '':
+            return entry
+        else:
+            return '/'.join([self._path, entry])
 
     def __iter__(self):
-        for entry in self._tree:
+        directories = [entry for entry in self._tree if entry.filemode == pygit2.GIT_FILEMODE_TREE]
+        files = [entry for entry in self._tree if entry.filemode != pygit2.GIT_FILEMODE_TREE]
+
+        for entry in directories + files:
             obj = entry.to_object()
             if obj.type == pygit2.GIT_OBJ_TREE:
-                item = TreeModel(self._repo, obj, entry.name)
+                item = TreeModel(self._repo, self._commit, obj, self._get_subpath(entry.name), self._ref)
             elif obj.type == pygit2.GIT_OBJ_BLOB:
-                item = BlobModel(self._repo, obj, entry.name)
+                item = BlobModel(self._repo, self._commit, obj, self._get_subpath(entry.name), self._ref)
             else:
                 raise Exception
 
             yield item
 
     def __getitem__(self, key):
-        return BlobModel(self._repo, self._tree[key].to_object(), key)
+        # pygit2 currently returns TypeError when a TreeEntry does not have a key, so mask this
+        # and return the correct exception
+        try:
+            return BlobModel(self._repo, self._commit, self._tree[key].to_object(), key, self._ref)
+        except TypeError:
+            raise KeyError
+
+    def breadcrumbs(self):
+        crumbs = []
+        for i, x in enumerate(self._path.split('/')):
+            item = {}
+            item['entry'] = x
+            item['url'] = url_for('summary', ref=self._ref, path='/'.join(self._path.split('/')[:i+1]))
+            crumbs.append(item)
+
+        crumbs[-1]['class'] = 'active'
+
+        return crumbs
+
 
 
 class BlobModel(object):
-    def __init__(self, repo, blob, name):
+    def __init__(self, repo, commit, blob, name, ref):
         self._repo = repo
         self._blob = blob
-        self.name = name
-        self.url = u'/blobs/%s' % self._blob.hex
+        self._ref = ref
+        self.name = os.path.basename(name)
+        self.path = name
+        self.url = url_for('file', ref=self._ref, filename=self.path)
         self.data = self._blob.data
+        self.type = 'file'
 
 class CommitModel(object):
-    def __init__(self, repo, commit):
+    def __init__(self, repo, commit, ref):
         self._repo = repo
         self._commit = commit
+        self._ref = ref
         self.url = url_for('commit', sha1=self._commit.hex)
         self.timestamp = self._commit.author.time
         self.author = self._commit.author
         self.committer = self._commit.committer
         self.hex = self._commit.hex
-        self.tree = TreeModel(self._repo, self._commit.tree)
+        self.tree = TreeModel(self._repo, self._commit, self._commit.tree, '/', self._ref)
 
     def age(self):
         dt = datetime.fromtimestamp(self.timestamp)
@@ -69,7 +110,7 @@ class CommitModel(object):
         return '\n'.join(self._commit.message.split('\n')[1:]).lstrip('\n')
 
     def parents(self):
-        return [CommitModel(parent) for parent in self._commit.parents]
+        return [CommitModel(self._repo, parent, self._ref) for parent in self._commit.parents]
 
     def short(self):
         return self.hex[:8]
@@ -135,17 +176,19 @@ class DiffHunkContextModel(object):
         pass
 
 class PageModel(object):
-    def __init__(self, page, active):
+    def __init__(self, page, active, url):
         self.page = page
         self.active = active
+        self.url = url
 
 class PaginationModel(object):
-    def __init__(self, items, limit, current, depth):
+    def __init__(self, items, limit, current, depth, url_base):
         self._items = items
         self._limit = limit
         self._current = current
         self._depth = depth
         self._pages = int(ceil(items / limit))
+        self._url_base = url_base
 
         assert depth % 2 == 1
         #self.current_page = (self._current / self._items) + 1
@@ -157,7 +200,21 @@ class PaginationModel(object):
                 active = 'active'
             else:
                 active = ''
-            yield PageModel(page, active)
+            yield PageModel(page, active, url_for(self._url_base, page=page, limit=self._limit))
+
+class NextPageModel(PageModel):
+    def __init__(self, page, active, url):
+        PageModel.__init__(self, page, active, url)
+        self.text = 'Next'
+
+class PrevPageModel(PageModel):
+    def __init__(self, page, active, url):
+        PageModel.__init__(self, page, active, url)
+        self.text = 'Previous'
+
+class NextPrevPaginationModel(PaginationModel):
+    def __iter__(self):
+        pass
 
 class TagModel(object):
     def __init__(self, ref):
@@ -172,20 +229,36 @@ class BranchModel(object):
 
 
 @app.route('/')
-def summary():
-    head = repo.head
+@app.route('/tree/<ref>/<path:path>')
+@app.route('/tree/<ref>')
+def summary(ref=None, path=''):
+    if ref is None:
+        head = app.repo.head
+    else:
+        head = app.repo.revparse_single(ref)
 
-    tree = TreeModel(repo, head.tree)
+
+    gt = head.tree
+    if path != '':
+        gt = head.tree[path].to_object()
+
+
+    tree = TreeModel(app.repo, head, gt, path, ref)
 
     entries = tree
 
-    commit = CommitModel(repo, repo.head)
+    commit = CommitModel(app.repo, head, None)
 
-    branch = repo.lookup_reference('HEAD').target.replace('refs/heads/', '', 1)
-    branches = [BranchModel(x) for x in repo.listall_references() if x.startswith('refs/heads/')]
-    tags = [TagModel(x) for x in repo.listall_references() if x.startswith('refs/tags/')]
+    #branch = repo.lookup_reference('HEAD').target.replace('refs/heads/', '', 1)
+    branch = ref
+    branches = [BranchModel(x) for x in app.repo.listall_references() if x.startswith('refs/heads/')]
+    tags = [TagModel(x) for x in app.repo.listall_references() if x.startswith('refs/tags/')]
 
-    readme = tree['README.md']
+    try:
+        readme = tree['README.md']
+        readme.data = markdown(readme.data)
+    except KeyError:
+        readme = ''
 
 
     renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
@@ -207,16 +280,19 @@ def commits(ref=None):
     except ValueError:
         abort(400)
 
-    head = repo.head
+    if ref == None:
+        head = app.repo.head
+    else:
+        head = app.repo.revparse_single(ref)
     commits = []
 
-    for index, commit in enumerate(repo.walk(head.oid, pygit2.GIT_SORT_TIME)):
+    for index, commit in enumerate(app.repo.walk(head.oid, pygit2.GIT_SORT_TIME)):
         if index >= (limit * (page - 1)) and index < (limit * page):
-            commits.append(CommitModel(repo, commit))
+            commits.append(CommitModel(app.repo, commit, ref))
         elif index >= (limit * page):
             pass
 
-    pagination = PaginationModel(index, limit, page, 5)
+    pagination = PaginationModel(index, limit, page, 5, 'commits')
 
     renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'], string_encoding='utf-8')
     loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
@@ -227,22 +303,21 @@ def commits(ref=None):
 
 @app.route('/commit/<sha1>')
 def commit(sha1):
-    commit = CommitModel(repo, repo[sha1])
+    commit = CommitModel(app.repo, app.repo[sha1], sha1)
 
-    diff = repo[sha1].tree.diff(repo[sha1].parents[0].tree)
-    dm = DiffModel(repo, commit, diff)
+    diff = app.repo[sha1].tree.diff(app.repo[sha1].parents[0].tree)
+    dm = DiffModel(app.repo, commit, diff)
 
-    renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
+    renderer = pystache.Renderer(file_extension='html', search_dirs=['/home/dan/dev/gasket/templates'], string_encoding='utf-8')
     loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
     #with open('tree.html') as fh:
     #    return pystache.render(fh.read(), entries=entries)
     return renderer.render(loader.load_name('commit'), commit=commit, sha1=sha1, diff=dm)
 
-
 @app.route('/trees/<ref>')
 def tree(ref):
-    i = repo[ref]
-    tree = TreeModel(repo, i.hex)
+    i = app.repo[ref]
+    tree = TreeModel(app.repo, i, i.tree, None, ref)
 
     entries = tree
 
@@ -252,18 +327,18 @@ def tree(ref):
     #    return pystache.render(fh.read(), entries=entries)
     return renderer.render(loader.load_name('tree'), sha1=ref, entries=entries)
 
-@app.route('/commits/<sha1>/<filename>')
-def file(sha1, filename):
-    commit = repo[sha1]
-    data = repo[commit.tree[filename].oid].data
+@app.route('/commits/<ref>/<path:filename>')
+def file(ref, filename):
+    commit = app.repo.revparse_single(ref)
+    data = app.repo[commit.tree[filename].oid].data
 
-    renderer = pystache.Renderer(file_extension='html', file_encoding='utf-8', search_dirs=['/home/dan/dev/gasket/templates'])
+    renderer = pystache.Renderer(file_extension='html', string_encoding='utf-8', search_dirs=['/home/dan/dev/gasket/templates'])
     loader = pystache.loader.Loader(extension='html', search_dirs=['/home/dan/dev/gasket/templates'])
 
     return renderer.render(loader.load_name('file'), data=data)
 
 if __name__ == '__main__':
 
-    repo = pygit2.Repository('/home/dan/libgit2')
+    app.repo = pygit2.Repository('/home/dan/libgit2')
     app.debug = True
-    app.run()
+    app.run(host='0.0.0.0')
