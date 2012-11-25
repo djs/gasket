@@ -9,26 +9,36 @@
 
             <div class="row">
                 <div class="span10">
+{{#diff.files}}
                     <table class="table">
                         <thead>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th><p>--- {{old_file}}</p>
+                                    <p>+++ {{new_file}}</p></th>
+                            </tr>
                         </thead>
 
                         <tbody>
-{{#diff}}
-                            <tr>
+                            {{#hunks}}
+                            <tr class="diffheader">
                                 <td></td>
                                 <td></td>
                                 <td>{{header}}</td>
                             </tr>
-                            {{#hunk}}
+                            {{#lines}}
                             <tr class="diff">
                                 <td>{{old_line}}</td>
                                 <td>{{new_line}}</td>
                                 <td class="{{kind}}" nowrap>{{data}}</td>
                             </tr>
-                            {{/hunk}}
-{{/diff}}
+                            {{/lines}}
+                            {{/hunks}}
                         </tbody>
+                    </table>
+{{/diff.files}}
+
 
                 </div>
             </div>

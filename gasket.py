@@ -158,8 +158,28 @@ class DiffHunkModel(object):
 
         return hunk
 
-    def hunk(self):
+    @property
+    def lines(self):
         return self._build_diff_hunk(self._hunk.data)
+
+class DiffFileModel(object):
+    def __init__(self, repo, commit, diff, hunks):
+        self._repo = repo
+        self._commit = commit
+        self._diff = diff
+        self._hunks = hunks
+
+        self.old_file = self._hunks[0].old_file
+        self.new_file = self._hunks[0].new_file
+
+    @property
+    def hunks(self):
+        hm = []
+        for hunk in self._hunks:
+            hm.append(DiffHunkModel(self._repo, self._commit, hunk))
+
+        return hm
+
 
 class DiffModel(object):
     def __init__(self, repo, commit, diff):
@@ -167,9 +187,15 @@ class DiffModel(object):
         self._commit = commit
         self._diff = diff
 
-    def __iter__(self):
-        for hunk in self._diff.changes['hunks']:
-            yield DiffHunkModel(self._repo, self._commit, hunk)
+    @property
+    def files(self):
+        df = []
+        for old_file in [x[0] for x in self._diff.changes['files']]:
+            hunks = [hunk for hunk in self._diff.changes['hunks'] if hunk.old_file == old_file]
+            df.append(DiffFileModel(self._repo, self._commit, self._diff, hunks))
+
+        return df
+
 
 class DiffHunkContextModel(object):
     def __init__(self, repo, commit, data):
