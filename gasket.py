@@ -10,11 +10,11 @@ from math import ceil
 from markdown import markdown
 import os.path
 
-from flask_debugtoolbar import DebugToolbarExtension
+#from flask_debugtoolbar import DebugToolbarExtension
 
 app = Flask(__name__)
-app.config['SECRETKEY'] = '24wejfhdsjfhwfgsfdsghfsdf'
-toolbar = DebugToolbarExtension(app)
+#app.config['SECRETKEY'] = '24wejfhdsjfhwfgsfdsghfsdf'
+#toolbar = DebugToolbarExtension(app)
 
 
 class TreeModel(object):
